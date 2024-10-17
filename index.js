@@ -1,62 +1,46 @@
 const express = require('express');
 const mqtt = require('mqtt');
 const client = mqtt.connect('mqtt://mqtt-dashboard.com');
-const db = require('./db');
 
 const app = express();
 
-const RFID_TOPIC = "rfid/scan";
-const RESPONSE_TOPIC = "rfid/response";
 const SENSOR_TOPIC = "cho/sensor";
 
 const isFull = 1;
 const isEmpty = 0;
 
-app.get('/', (req, res) => {
-    res.send('Welcome to the RFID and Sensor Monitoring System');
+let currentSensorStatus = null; // 센서 상태를 저장하기 위한 변수
+
+// 센서 상태 반환 API
+app.get('/sensor/status', (req, res) => {
+    if (currentSensorStatus === null) {
+        return res.status(404).send('센서 상태를 아직 받지 못했습니다');
+    }
+
+    res.send({ status: currentSensorStatus }); // 0 (Empty), 1 (Full) 그대로 반환
 });
 
+// MQTT 연결 및 메시지 처리
 client.on('connect', () => {
-    client.subscribe([RFID_TOPIC, SENSOR_TOPIC], (err) => {
+    client.subscribe([SENSOR_TOPIC], (err) => {
         if (!err) {
-            console.log(`Subscribed to topics: ${RFID_TOPIC}, ${SENSOR_TOPIC}`);
+            console.log(`토픽 구독: ${SENSOR_TOPIC}`);
         } else {
-            console.error('Subscription error');
+            console.error('구독 오류');
         }
     });
 });
 
 client.on('message', (topic, message) => {
-    let messageStr = message.toString();
-
-    if (topic === RFID_TOPIC) {
-        const cardnum = messageStr.replace(/\s+/g, '');
-
-        db.query('SELECT cardnum FROM hardware WHERE cardnum = ?', [cardnum], (err, results) => {
-            if (err) {
-                console.error('Database query error');
-                return;
-            }
-
-            const exists = results.length > 0 ? '1' : '0';
-
-            client.publish(RESPONSE_TOPIC, exists, (err) => {
-                if (err) {
-                    console.error('MQTT publish error', err);
-                } else {
-                    console.log(`Sent response: ${exists} for cardnum: ${cardnum}`);
-                }
-            });
-        });
-    }
+    const messageStr = message.toString();
 
     if (topic === SENSOR_TOPIC) {
-        const sensorStatus = messageStr === "1" ? isFull : isEmpty;
-        console.log(`Sensor status: ${sensorStatus}`);
-        // You can publish or process the sensor status as needed
+        currentSensorStatus = messageStr === "1" ? isFull : isEmpty;
+        console.log(`센서 상태: ${currentSensorStatus}`);
     }
 });
 
+// 서버 실행
 app.listen(3000, () => {
-    console.log('Server is running on port 3000');
+    console.log('서버가 3000번 포트에서 실행 중입니다');
 });
