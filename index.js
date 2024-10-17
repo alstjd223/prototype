@@ -12,6 +12,10 @@ const SENSOR_TOPIC = "cho/sensor";
 const isFull = 1;
 const isEmpty = 0;
 
+app.get('/', (req, res) => {
+    res.send('Welcome to the RFID and Sensor Monitoring System');
+});
+
 client.on('connect', () => {
     client.subscribe([RFID_TOPIC, SENSOR_TOPIC], (err) => {
         if (!err) {
@@ -30,11 +34,8 @@ client.on('message', (topic, message) => {
 
         db.query('SELECT cardnum FROM hardware WHERE cardnum = ?', [cardnum], (err, results) => {
             if (err) {
-                /*
                 console.error('Database query error');
                 return;
-                */
-               results = '2CC7E371';
             }
 
             const exists = results.length > 0 ? '1' : '0';
@@ -50,13 +51,12 @@ client.on('message', (topic, message) => {
     }
 
     if (topic === SENSOR_TOPIC) {
-        if (message){
-            return isFull;
-        }
-        else{
-            return isEmpty;
-        }
+        const sensorStatus = messageStr === "1" ? isFull : isEmpty;
+        console.log(`Sensor status: ${sensorStatus}`);
+        // You can publish or process the sensor status as needed
     }
 });
 
-app.listen(3000);
+app.listen(3000, () => {
+    console.log('Server is running on port 3000');
+});
